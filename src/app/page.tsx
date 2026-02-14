@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
-import { Mic, MicOff, Power, Zap, Brain, ListTodo, Settings } from "lucide-react";
+import { Mic, Power, Zap, Brain, ListTodo, Settings, Send, Loader2 } from "lucide-react";
 import { SettingsModal } from "@/components/settings-modal";
 
 interface Message {
@@ -10,6 +10,7 @@ interface Message {
   role: "user" | "jarvis";
   text: string;
   timestamp: Date;
+  source?: "voice" | "text";
 }
 
 function getGreeting(): string {
@@ -24,7 +25,11 @@ export default function JarvisHome() {
   const [isActive, setIsActive] = useState(false);
   const [usage, setUsage] = useState({ totalCost: 0, todayCost: 0, totalConversations: 0 });
   const [showSettings, setShowSettings] = useState(false);
+  const [textInput, setTextInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const {
     isConnected,
@@ -44,7 +49,7 @@ export default function JarvisHome() {
       if (text.trim()) {
         setMessages((prev) => [
           ...prev,
-          { id: `user_${Date.now()}`, role: "user", text: text.trim(), timestamp: new Date() },
+          { id: `user_${Date.now()}`, role: "user", text: text.trim(), timestamp: new Date(), source: "voice" },
         ]);
       }
     },
@@ -52,7 +57,7 @@ export default function JarvisHome() {
       if (text.trim()) {
         setMessages((prev) => [
           ...prev,
-          { id: `jarvis_${Date.now()}`, role: "jarvis", text: text.trim(), timestamp: new Date() },
+          { id: `jarvis_${Date.now()}`, role: "jarvis", text: text.trim(), timestamp: new Date(), source: "voice" },
         ]);
       }
     },
@@ -67,7 +72,7 @@ export default function JarvisHome() {
   // Auto-scroll messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, aiTranscript]);
+  }, [messages, aiTranscript, isTyping]);
 
   const handleToggle = async () => {
     if (isActive) {
@@ -82,6 +87,68 @@ export default function JarvisHome() {
       } catch (err) {
         console.error("Failed to start:", err);
       }
+    }
+  };
+
+  // Text chat via Euri
+  const handleSendText = async () => {
+    const text = textInput.trim();
+    if (!text || isTyping) return;
+
+    // Add user message
+    const userMsg: Message = {
+      id: `user_text_${Date.now()}`,
+      role: "user",
+      text,
+      timestamp: new Date(),
+      source: "text",
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setTextInput("");
+    setIsTyping(true);
+
+    // Build chat history for context
+    const newHistory = [...chatHistory, { role: "user" as const, content: text }];
+    setChatHistory(newHistory);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newHistory }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to get response");
+      }
+
+      const aiText = data.content || "I couldn't generate a response.";
+
+      // Add AI response
+      setMessages((prev) => [
+        ...prev,
+        { id: `jarvis_text_${Date.now()}`, role: "jarvis", text: aiText, timestamp: new Date(), source: "text" },
+      ]);
+
+      // Update chat history
+      setChatHistory([...newHistory, { role: "assistant", content: aiText }]);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to connect";
+      setMessages((prev) => [
+        ...prev,
+        { id: `error_${Date.now()}`, role: "jarvis", text: `Error: ${errorMsg}`, timestamp: new Date(), source: "text" },
+      ]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendText();
     }
   };
 
@@ -118,10 +185,10 @@ export default function JarvisHome() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-2xl flex flex-col items-center justify-center gap-8">
+      <main className="flex-1 w-full max-w-2xl flex flex-col items-center justify-center gap-6">
         {/* Conversation Messages */}
         {messages.length > 0 && (
-          <div className="w-full max-h-[40vh] overflow-y-auto space-y-3 mb-4">
+          <div className="w-full max-h-[40vh] overflow-y-auto space-y-3 mb-2">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -135,15 +202,30 @@ export default function JarvisHome() {
                   }`}
                 >
                   {msg.text}
+                  {msg.source === "text" && (
+                    <span className="block text-[10px] text-text-muted/40 mt-1 font-jetbrains">
+                      {msg.role === "jarvis" ? "via Euri" : "text"}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
 
-            {/* Live AI transcript */}
+            {/* Live AI transcript (voice) */}
             {aiTranscript && (
               <div className="flex justify-start fade-up">
                 <div className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-bl-md transcript-bubble text-sm text-text-secondary italic">
                   {aiTranscript}
+                </div>
+              </div>
+            )}
+
+            {/* Typing indicator (text) */}
+            {isTyping && (
+              <div className="flex justify-start fade-up">
+                <div className="px-4 py-2.5 rounded-2xl rounded-bl-md transcript-bubble text-sm text-text-secondary">
+                  <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                  Thinking...
                 </div>
               </div>
             )}
@@ -165,18 +247,18 @@ export default function JarvisHome() {
           {/* Main Orb */}
           <button
             onClick={handleToggle}
-            className={`relative w-40 h-40 sm:w-48 sm:h-48 rounded-full flex items-center justify-center transition-all duration-500 cursor-pointer ${orbClass}`}
+            className={`relative w-36 h-36 sm:w-44 sm:h-44 rounded-full flex items-center justify-center transition-all duration-500 cursor-pointer ${orbClass}`}
           >
             {/* Inner icon */}
             <div className="flex flex-col items-center gap-2">
               {isActive ? (
                 <>
                   {isSpeaking ? (
-                    <Brain className="w-10 h-10 text-jarvis-gold" />
+                    <Brain className="w-9 h-9 text-jarvis-gold" />
                   ) : isListening ? (
-                    <Mic className="w-10 h-10 text-jarvis-gold" />
+                    <Mic className="w-9 h-9 text-jarvis-gold" />
                   ) : (
-                    <Power className="w-10 h-10 text-jarvis-gold" />
+                    <Power className="w-9 h-9 text-jarvis-gold" />
                   )}
                   <span className="text-xs font-jetbrains text-jarvis-gold/80 tracking-wider">
                     {isSpeaking ? "SPEAKING" : isListening ? "LISTENING" : "READY"}
@@ -184,9 +266,9 @@ export default function JarvisHome() {
                 </>
               ) : (
                 <>
-                  <Power className="w-10 h-10 text-jarvis-gold/60" />
-                  <span className="text-xs font-jetbrains text-jarvis-gold/40 tracking-wider">
-                    TAP TO START
+                  <Power className="w-9 h-9 text-jarvis-gold/60" />
+                  <span className="text-[10px] font-jetbrains text-jarvis-gold/40 tracking-wider">
+                    TAP FOR VOICE
                   </span>
                 </>
               )}
@@ -198,8 +280,8 @@ export default function JarvisHome() {
         <div className="text-center space-y-1">
           {!isActive && messages.length === 0 && (
             <>
-              <p className="text-text-secondary text-sm">{getGreeting()}. Tap the orb to activate Jarvis.</p>
-              <p className="text-text-muted text-xs">Voice assistant ready</p>
+              <p className="text-text-secondary text-sm">{getGreeting()}. Tap the orb for voice, or type below.</p>
+              <p className="text-text-muted text-xs">Voice + text assistant ready</p>
             </>
           )}
           {error && (
@@ -211,10 +293,40 @@ export default function JarvisHome() {
             <p className="text-text-muted text-xs italic">You: {userTranscript}</p>
           )}
         </div>
+
+        {/* Text Input Bar */}
+        <div className="w-full max-w-2xl">
+          <div className="flex items-center gap-2 p-2 bg-[#141418] border border-[#3a3a44]/60 rounded-xl focus-within:border-jarvis-gold/40 transition-colors">
+            <input
+              ref={inputRef}
+              type="text"
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              disabled={isTyping}
+              className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-muted/40 px-3 py-2 focus:outline-none disabled:opacity-50"
+            />
+            <button
+              onClick={handleSendText}
+              disabled={!textInput.trim() || isTyping}
+              className="p-2.5 rounded-lg bg-jarvis-gold/20 border border-jarvis-gold/30 text-jarvis-gold hover:bg-jarvis-gold/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              {isTyping ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+          <p className="text-[10px] text-text-muted/40 text-center mt-1 font-jetbrains">
+            Powered by Euri (Gemini 2.5 Flash) &middot; 200K tokens/day free
+          </p>
+        </div>
       </main>
 
       {/* Footer Stats */}
-      <footer className="w-full max-w-2xl mt-8 pt-4 border-t border-steel-dark/50">
+      <footer className="w-full max-w-2xl mt-6 pt-4 border-t border-steel-dark/50">
         <div className="flex items-center justify-between text-xs text-text-muted">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
@@ -227,7 +339,7 @@ export default function JarvisHome() {
             </span>
           </div>
           <span className="font-jetbrains text-[10px] text-text-muted/60">
-            GPT-4o Mini Realtime
+            Voice: GPT-4o Mini &middot; Text: Euri
           </span>
         </div>
       </footer>
