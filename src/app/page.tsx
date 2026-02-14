@@ -38,7 +38,7 @@ export default function JarvisHome() {
     stopListening,
     error,
   } = useRealtimeVoice({
-    voice: "onyx",
+    voice: "ash",
     model: "gpt-4o-mini-realtime-preview-2024-12-17",
     onTranscript: (text) => {
       if (text.trim()) {

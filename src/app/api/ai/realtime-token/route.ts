@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const voice = body.voice || "onyx";
+    const voice = body.voice || "ash";
     const REALTIME_MODEL = ALLOWED_MODELS.includes(body.model) ? body.model : DEFAULT_REALTIME_MODEL;
 
     // Inject memory context into instructions

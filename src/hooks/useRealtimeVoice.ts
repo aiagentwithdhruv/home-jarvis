@@ -6,7 +6,7 @@ interface UseRealtimeVoiceOptions {
   onTranscript?: (text: string, isFinal: boolean) => void;
   onAIResponse?: (text: string) => void;
   onError?: (error: string) => void;
-  voice?: "alloy" | "ash" | "ballad" | "coral" | "echo" | "sage" | "shimmer" | "verse" | "onyx";
+  voice?: "alloy" | "ash" | "ballad" | "coral" | "echo" | "sage" | "shimmer" | "verse";
   model?: string;
 }
 
@@ -24,7 +24,7 @@ interface UseRealtimeVoiceReturn {
 }
 
 export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}): UseRealtimeVoiceReturn {
-  const { onTranscript, onAIResponse, onError, voice = "onyx", model } = options;
+  const { onTranscript, onAIResponse, onError, voice = "ash", model } = options;
 
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
