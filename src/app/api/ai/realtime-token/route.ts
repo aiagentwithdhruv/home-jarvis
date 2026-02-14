@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       },
     ];
 
-    // GA Realtime API format — voice nested under audio.output
+    // GA Realtime API — minimal config (most params set via session.update)
     const sessionConfig = {
       type: "realtime" as const,
       model: REALTIME_MODEL,
@@ -83,13 +83,6 @@ export async function POST(request: Request) {
       tools: realtimeTools,
       audio: {
         output: { voice },
-      },
-      turn_detection: {
-        type: "server_vad",
-        threshold: 0.5,
-        prefix_padding_ms: 300,
-        silence_duration_ms: 800,
-        create_response: true,
       },
     };
 
