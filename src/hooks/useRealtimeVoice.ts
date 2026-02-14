@@ -226,20 +226,13 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}): UseReal
         ]);
 
         ws.onopen = () => {
-          // Minimal session.update — voice/audio set via client_secrets
+          // Minimal session.update — voice/audio/VAD set via client_secrets
           ws.send(JSON.stringify({
             type: "session.update",
             session: {
               type: "realtime",
               instructions: serverInstructions,
               tools: serverTools,
-              turn_detection: {
-                type: "server_vad",
-                threshold: 0.5,
-                prefix_padding_ms: 300,
-                silence_duration_ms: 800,
-                create_response: true,
-              },
             },
           }));
           setIsConnected(true);

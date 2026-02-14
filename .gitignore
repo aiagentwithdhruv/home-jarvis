@@ -5,3 +5,4 @@ usage-data.json
 memory-data.json
 tasks-data.json
 next-env.d.ts
+node_modules
