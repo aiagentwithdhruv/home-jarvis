@@ -2,8 +2,38 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
-import { Mic, Power, Zap, Brain, ListTodo, Settings, Send, Loader2 } from "lucide-react";
+import { Mic, Power, Zap, Brain, ListTodo, Settings, Send, Loader2, ChevronDown } from "lucide-react";
 import { SettingsModal } from "@/components/settings-modal";
+
+const TEXT_MODELS = [
+  { group: "Google", models: [
+    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", tag: "Fast" },
+    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", tag: "Smart" },
+    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", tag: "Fast" },
+    { id: "gemini-2.5-flash-lite-preview-06-17", name: "Gemini 2.5 Flash Lite", tag: "Ultra-fast" },
+  ]},
+  { group: "OpenAI", models: [
+    { id: "gpt-5-nano-2025-08-07", name: "GPT-5 Nano", tag: "Ultra-fast" },
+    { id: "gpt-5-mini-2025-08-07", name: "GPT-5 Mini", tag: "Fast" },
+    { id: "gpt-4.1-nano", name: "GPT-4.1 Nano", tag: "Ultra-fast" },
+    { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", tag: "Fast" },
+    { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B", tag: "Medium" },
+    { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B", tag: "Powerful" },
+  ]},
+  { group: "Meta", models: [
+    { id: "llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout", tag: "Fast" },
+    { id: "llama-4-maverick-17b-128e-instruct", name: "Llama 4 Maverick", tag: "Medium" },
+    { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", tag: "Versatile" },
+    { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B", tag: "Instant" },
+  ]},
+  { group: "Groq", models: [
+    { id: "groq/compound", name: "Groq Compound", tag: "Web Search" },
+    { id: "groq/compound-mini", name: "Groq Compound Mini", tag: "Web Search" },
+  ]},
+  { group: "Alibaba", models: [
+    { id: "qwen/qwen3-32b", name: "Qwen 3 32B", tag: "Fast" },
+  ]},
+];
 
 interface Message {
   id: string;
@@ -28,6 +58,8 @@ export default function JarvisHome() {
   const [textInput, setTextInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -115,7 +147,7 @@ export default function JarvisHome() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newHistory }),
+        body: JSON.stringify({ messages: newHistory, model: selectedModel }),
       });
 
       const data = await res.json();
@@ -296,6 +328,46 @@ export default function JarvisHome() {
 
         {/* Text Input Bar */}
         <div className="w-full max-w-2xl">
+          {/* Model Selector */}
+          <div className="relative mb-2">
+            <button
+              onClick={() => setShowModelPicker(!showModelPicker)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-jetbrains text-text-muted hover:text-jarvis-gold/80 bg-[#141418] border border-[#3a3a44]/40 rounded-lg hover:border-jarvis-gold/30 transition-all"
+            >
+              <span className="text-text-muted/60">Model:</span>
+              <span className="text-text-secondary">{TEXT_MODELS.flatMap(g => g.models).find(m => m.id === selectedModel)?.name || selectedModel}</span>
+              <ChevronDown className={`w-3 h-3 transition-transform ${showModelPicker ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showModelPicker && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowModelPicker(false)} />
+                <div className="absolute bottom-full left-0 mb-1 z-50 w-72 max-h-80 overflow-y-auto bg-[#141418] border border-[#3a3a44] rounded-xl shadow-2xl">
+                  {TEXT_MODELS.map((group) => (
+                    <div key={group.group}>
+                      <div className="px-3 py-1.5 text-[10px] font-jetbrains text-text-muted/50 uppercase tracking-wider bg-[#0a0a0f]/50 sticky top-0">
+                        {group.group}
+                      </div>
+                      {group.models.map((model) => (
+                        <button
+                          key={model.id}
+                          onClick={() => { setSelectedModel(model.id); setShowModelPicker(false); }}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-jarvis-gold/10 transition-colors ${
+                            selectedModel === model.id ? 'bg-jarvis-gold/15 text-jarvis-gold' : 'text-text-secondary'
+                          }`}
+                        >
+                          <span>{model.name}</span>
+                          <span className="text-[10px] text-text-muted/50 font-jetbrains">{model.tag}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Input */}
           <div className="flex items-center gap-2 p-2 bg-[#141418] border border-[#3a3a44]/60 rounded-xl focus-within:border-jarvis-gold/40 transition-colors">
             <input
               ref={inputRef}
@@ -320,7 +392,7 @@ export default function JarvisHome() {
             </button>
           </div>
           <p className="text-[10px] text-text-muted/40 text-center mt-1 font-jetbrains">
-            Powered by Euri (Gemini 2.5 Flash) &middot; 200K tokens/day free
+            Powered by Euri &middot; 200K tokens/day free &middot; 20+ models
           </p>
         </div>
       </main>
@@ -339,7 +411,7 @@ export default function JarvisHome() {
             </span>
           </div>
           <span className="font-jetbrains text-[10px] text-text-muted/60">
-            Voice: GPT-4o Mini &middot; Text: Euri
+            Voice: GPT-4o Mini &middot; Text: {TEXT_MODELS.flatMap(g => g.models).find(m => m.id === selectedModel)?.name || "Euri"}
           </span>
         </div>
       </footer>
